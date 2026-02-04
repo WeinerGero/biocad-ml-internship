@@ -1,6 +1,6 @@
 import time
 import json
-from parser import Parser
+from PubMed_pasrer import Parser
 
 
 LIMIT = 100

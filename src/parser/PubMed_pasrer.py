@@ -288,26 +288,26 @@ if __name__ == "__main__":
             parsed_data = parser.parse_article(raw_record)
             
             if parsed_data:
-                print(f"   Processing: {parsed_data['pmid']} - {parsed_data['title'][:30]}...")
+                logging.info(f"   Processing: {parsed_data['pmid']} - {parsed_data['title'][:30]}...")
                 
                 # Обогащение (Вытаскиваем Intro/Conclusion через PMC)
                 enriched_data = parser.enrich_article_with_fulltext(parsed_data)
                 
                 # Логика: если Intro нашлось - отлично. Если нет - оставляем хотя бы абстракт.
                 if enriched_data.get('introduction'):
-                    print(f"      [+] Full text sections found!")
+                    logging.info(f"      [+] Full text sections found!")
                 else:
-                    print(f"      [-] Only Abstract available (PMC parsing failed or structure differs).")
+                    logging.info(f"      [-] Only Abstract available (PMC parsing failed or structure differs).")
                 
                 final_dataset.append(enriched_data)
                 
                 time.sleep(0.5)
     else:
-        print("No articles found.")
+        logging.warning("No articles found.")
     
     # Сохранение результата в JSON файл
     output_file = 'data/alzheimer_articles.json'
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(final_dataset, f, ensure_ascii=False, indent=4)
         
-    print(f"\nSaved {len(final_dataset)} articles to {output_file}")
+    logging.info(f"\nSaved {len(final_dataset)} articles to {output_file}")
