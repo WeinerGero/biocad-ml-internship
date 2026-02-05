@@ -54,4 +54,38 @@ def create_chunks(articles: list[dict]) -> list[Document]:
     
     
 if __name__ == "__main__":
-    pass
+    import os
+    import shutil
+
+    # Загрузка статей из JSON
+    articles = load_json()
+    documents = create_chunks(articles)
+    print(f"Loaded {len(articles)} articles.")
+    
+    # Очищаем старую БД, если есть
+    persist_dir = "./db"
+    if os.path.exists(persist_dir):
+        print(f"Deleting old database at {persist_dir}...")
+        try:
+            shutil.rmtree(persist_dir)
+            print("Deleted.")
+        except PermissionError:
+            print("Permission denied while trying to delete the old database.")
+            exit(1)
+
+    # Создаём новую векторную БД
+    db = VectorDB()
+    
+    # Нарезаем на чанки
+    chunks = create_chunks(articles)
+    print(f"Created {len(chunks)} chunks.")
+    
+    # Сохраняем вектора в векторную БД
+    db.add_documents(documents=chunks)
+    
+    # Тестовый поиск
+    results = db.search("What is the role of TREM2?")
+    for doc, score in results:
+            print(f"\nScore: {score:.4f}")
+            print(f"Source: {doc.metadata.get('title', 'Unknown')}")
+            print(f"Content: {doc.page_content[:200]}...")

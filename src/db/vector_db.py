@@ -44,7 +44,7 @@ class VectorDB:
         :param k int: Количество возвращаемых результатов
         :return list[Document]: Список найденных документов
         """
-        return self.vector_store.similarity_search(query, k=k)
+        return self.vector_store.similarity_search_with_score(query, k=k)
 
 
 if __name__ == "__main__":
