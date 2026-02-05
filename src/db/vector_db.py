@@ -2,11 +2,7 @@ import os
 import shutil
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
-from langchain.schema import Document
-from dotenv import load_dotenv
-
-# Загрузка переменных окружения из файла .env
-load_dotenv()
+from langchain_core.documents import Document
 
 
 class VectorDB:
@@ -18,7 +14,7 @@ class VectorDB:
         # Эмбеддинг модель для медицинских текстов
         self.embedding_model = HuggingFaceEmbeddings(
                 model_name="pritamdeka/S-PubMedBert-MS-MARCO",
-                model_kwargs={'device': str(os.getenv("DEVICE")).lower()}, 
+                model_kwargs={'device': 'cpu'}, 
                 encode_kwargs={'normalize_embeddings': True} 
             )
         
@@ -52,4 +48,4 @@ class VectorDB:
 
 
 if __name__ == "__main__":
-    pass
+    VectorDB()
