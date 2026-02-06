@@ -1,7 +1,7 @@
 import json
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
-from vector_db import VectorDB
+from .vector_db import VectorDB
 
 
 def load_json():

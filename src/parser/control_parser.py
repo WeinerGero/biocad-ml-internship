@@ -3,7 +3,7 @@ import time
 import json
 from dotenv import load_dotenv
 
-from PubMed_pasrer import Parser
+from .PubMed_parser import Parser
 
 # Загрузка переменных окружения из файла .env
 load_dotenv()
