@@ -84,7 +84,7 @@ if __name__ == "__main__":
     db.add_documents(documents=chunks)
     
     # Тестовый поиск
-    results = db.search("What is the role of TREM2?")
+    results = db.search("What are potential targets for Alzheimer's disease treatment?")
     for doc, score in results:
             print(f"\nScore: {score:.4f}")
             print(f"Source: {doc.metadata.get('title', 'Unknown')}")

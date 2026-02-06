@@ -2,7 +2,6 @@ import json
 import os
 import logging
 import time
-from dotenv import load_dotenv
 import re
 
 from Bio import Entrez
@@ -10,13 +9,6 @@ from Bio import Entrez
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
-
-# Загрузка переменных окружения из файла .env
-load_dotenv()
-
-# Установка email и API ключа для Entrez
-Entrez.email = os.getenv("EMAIL")
-Entrez.api_key = os.getenv("NCBI_API_KEY")
 
 
 class Parser():
@@ -26,13 +18,22 @@ class Parser():
     :param query: строка запроса для поиска статей
     :max_count: максимальное количество статей для поиска
     """
-    def __init__(self, query=None, max_count=10):
+    def __init__(
+        self, query=None,
+        max_count=10,
+        email=None,
+        api_key=None
+        ):
         # Проверка наличия запроса
         if query is None:
             raise ValueError("Query must be provided.")
         
         self.query = query
-        self.max_count = max_count      
+        self.max_count = max_count 
+        
+        # Установка email и API ключа для Entrez
+        Entrez.email = email
+        Entrez.api_key = api_key  
     
     def search_pubmed_articles(self) -> list[str]:
         """
