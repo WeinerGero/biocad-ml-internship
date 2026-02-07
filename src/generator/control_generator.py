@@ -7,7 +7,7 @@ class RAGPipeline:
     def __init__(self, db_path="./db", model_name="llama3"):
         # Инициализация векторной базы данных и LLM модели
         self.vector_db = VectorDB(persist_dir=db_path)
-        self.llm = OllamaLLM(model=model_name, temperature=0.1)
+        self.llm = OllamaLLM(model=model_name, temperature=0.0)
         
         # Системный промт
         self.prompt_template = PromptTemplate.from_template(
@@ -47,7 +47,7 @@ class RAGPipeline:
         for doc in docs:
             pmid = doc.metadata.get("url", "N/A")
             year = doc.metadata.get("year", "N/A")
-            formatted_text += f"[Источник: https://pubmed.ncbi.nlm.nih.gov/{pmid}, Год: {year}]\n{doc.page_content}\n---\n"
+            formated_text += f"[Источник: https://pubmed.ncbi.nlm.nih.gov/{pmid}, Год: {year}]\n{doc.page_content}\n---\n"
         return formated_text
     
     def run(self, query: str, k: int=3):

@@ -145,7 +145,7 @@ class RAGJudge:
         results = []
         for i, item in enumerate(golden_set):
             print(f"   Evaluating case {i+1}/{len(golden_set)}...")
-            rag_output = rag_pipeline.run(item['question'], k=4)
+            rag_output = rag_pipeline.run(item['question'], k=3)
             eval_result = self.evaluate(rag_output, item['ground_truth'])
             results.append(eval_result)
         
