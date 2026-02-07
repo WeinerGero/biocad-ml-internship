@@ -10,23 +10,23 @@ class RAGJudge:
     def __init__(
         self,
         llm_model_name="llama3",
-        embedding_model_name="pritamdeka/S-PubMedBert-MS-MARCO"
+        embedding_model="pritamdeka/S-PubMedBert-MS-MARCO"
         ):
         """
         Судья для оценки качества ответов RAG агента. Использует LLM для анализа и HuggingFaceEmbeddings для оценки релевантности.
         
         :param llm_model_name str: Модель для качественной оценки
-        :param embedding_model_name str: Модель для количественной оценки
+        :param embedding_model str: Модель для количественной оценки
         """
         self.llm_model_name = llm_model_name
-        self.embedding_model_name = embedding_model_name
+        self.embedding_model = embedding_model
         
         # LLM для качественной оценки
         self.judge_llm = OllamaLLM(model=self.llm_model_name, temperature=0)
         
         # Эмбеддинг модель для количественной оценки
         self.embedding_model = HuggingFaceEmbeddings(
-            model_name=self.embedding_model_name,
+            model_name=self.embedding_model,
             model_kwargs={'device': 'cpu'},
             encode_kwargs={'normalize_embeddings': True},
         )
@@ -92,8 +92,8 @@ class RAGJudge:
         :param generated_answer str: Сгенерированный ответ
         """
         try:
-            vec_gt = self.embed_model.embed_query(ground_truth)
-            vec_gen = self.embed_model.embed_query(generated_answer)
+            vec_gt = self.embedding_model.embed_query(ground_truth)
+            vec_gen = self.embedding_model.embed_query(generated_answer)
             
             similarity = cosine_similarity([vec_gt], [vec_gen])[0][0]
             return round(float(similarity), 4)
