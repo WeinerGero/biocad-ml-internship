@@ -1,5 +1,6 @@
 import os
 import shutil
+from pathlib import Path
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
@@ -8,6 +9,9 @@ from langchain_core.documents import Document
 class VectorDB:
     """Векторная база данных для хранения и поиска эмбеддингов"""
     def __init__(self, collection_name="alzheimer_docs", persist_dir="./db"):
+        # Инициализация векторной базы данных с использованием Chroma и HuggingFaceEmbeddings
+        persist_dir = Path.cwd().parent / "db"
+
         self.persist_dir = persist_dir
         self.collection_name = collection_name
 

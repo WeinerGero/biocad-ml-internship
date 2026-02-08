@@ -1,12 +1,18 @@
 import json
+from pathlib import Path
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from .vector_db import VectorDB
 
 
 def load_json():
+    # Загружает статьи из JSON файла и возвращает их в виде списка словарей.
+    current_file_path = Path(__file__).resolve()
+    project_root = current_file_path.parents[2] 
+    output_file = project_root / "data" / "alzheimer_articles.json"
+        
     with open(
-        "./data/alzheimer_articles.json",
+        output_file,
         "r",
         encoding="utf-8",
         ) as f:
@@ -21,8 +27,8 @@ def create_chunks(articles: list[dict]) -> list[Document]:
     """
     # Настройки чанкинга
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
+        chunk_size=700,
+        chunk_overlap=150,
         separators=["\n\n", "\n", ". ", " ", ""]
     )
     

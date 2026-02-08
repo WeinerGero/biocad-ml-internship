@@ -148,8 +148,14 @@ class Parser():
             return ""
         # Удаляем HTML теги
         text = re.sub(r'<[^<]+?>', '', text)
+        
+        # Удаляем ссылки вида [1], [12], [1-3], [1–3] (с разными тире)
+        text = re.sub(r'\[\d+[–-]?\d*(?:,\s*\d+)*\]', '', text)
+        
         # Удаляем лишние пробелы (двойные, табы, переносы)
         text = " ".join(text.split())
+        text = re.sub(r'\s+', ' ', text).strip()
+
         return text
     
     def get_pmcid_from_pmid(self, pmid):
