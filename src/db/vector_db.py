@@ -10,9 +10,9 @@ class VectorDB:
     """Векторная база данных для хранения и поиска эмбеддингов"""
     def __init__(self, collection_name="alzheimer_docs", persist_dir="./db"):
         # Инициализация векторной базы данных с использованием Chroma и HuggingFaceEmbeddings
-        persist_dir = Path.cwd().parent / "db"
+        project_root = Path(__file__).resolve().parents[2]
 
-        self.persist_dir = persist_dir
+        self.persist_dir = str(project_root / "db")
         self.collection_name = collection_name
 
         # Эмбеддинг модель для медицинских текстов
@@ -26,7 +26,7 @@ class VectorDB:
         self.vector_store = Chroma(
             collection_name=collection_name,
             embedding_function=self.embedding_model,
-            persist_directory=persist_dir
+            persist_directory=self.persist_dir
         )
         
     def add_documents(self, batch_size: int=100, documents: list[Document]=None):
