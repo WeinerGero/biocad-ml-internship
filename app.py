@@ -2,21 +2,9 @@ import streamlit as st
 import time
 
 from src.generator.control_generator import RAGPipeline
+from src.ui.state_manager import init_session_state, save_history
+from src.ui.components import render_sidebar, render_sources, render_message
 
-####### УБРАТЬ ЭТОТ БЛОК ПОСЛЕ СОЗДАНИЯ UI #######
-try:
-    from src.ui.state_manager import init_session_state
-    from src.ui.components import render_sidebar, render_sources, render_message
-except ImportError:
-    # Заглушка, пока ты не создал файлы UI
-    def init_session_state(): 
-        if "messages" not in st.session_state: st.session_state.messages = []
-    def render_sidebar(): return 15
-    def render_sources(docs): st.write(docs)
-    def render_message(role, content, sources=None):
-        with st.chat_message(role):
-            st.markdown(content)
-            if sources: render_sources(sources)
 
 # Конфигурация страницы Streamlit
 st.set_page_config(
@@ -25,6 +13,26 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Стилизация для оптимальной читаемости (макс. ширина, скругление сообщений)
+st.markdown(
+    """
+    <style>
+    .block-container {
+        max_width: 850px;
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        margin: auto; 
+    }
+    
+    .stChatMessage {
+        border-radius: 15px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 
 # Кешируем загрузку RAGPipeline, с помощью cache_resource,
 # чтобы не перезагружать модель при каждом взаимодействии
@@ -50,7 +58,7 @@ k_value = render_sidebar()
 
 # Интерфейс чата
 st.title("АА – Альцгеймер-Ассистент")
-st.caption("Задайте вопрос о болезни Альцгеймера, и я найду ответы в последних научных статьях")
+st.caption("Поможет вспомнить статью, которую вы читали на днях")
 
 # Отрисовка истории (чтобы сообщения не пропадали)
 for msg in st.session_state.messages:
@@ -93,5 +101,6 @@ if prompt := st.chat_input("Введите ваш вопрос об исслед
         st.session_state.messages.append({
             "role": "assistant",
             "content": result["answer"],
-            "sources": result["source_documents"] # Сохраняем источники, чтобы они остались при перезагрузке
         })
+        
+        save_history() 

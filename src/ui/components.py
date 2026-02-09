@@ -1,33 +1,69 @@
+import os
 import streamlit as st
 
 
 def render_sidebar():
     """
-    Отрисовывает боковую панель с настройками.
-    Возвращает выбранное значение k.
+    Отрисовывает боковую панель с настройками и тех. данными.
     """
     with st.sidebar:
-        st.header("Настройки поиска")
+        st.header("⚙️ Настройки RAG")
         
-        # Настройка глубины поиска
         k_value = st.slider(
             "Количество статей (k)", 
             min_value=3, 
             max_value=20, 
             value=15,
-            help="Сколько уникальных статей анализировать для ответа."
+            help="Сколько уникальных статей анализировать. Больше k = лучше ответ, но дольше генерация."
         )
         
         st.divider()
         
-        # Кнопка очистки истории
-        if st.button("Очистить диалог", use_container_width=True):
+        # Кнопка для очистки диалога
+        if st.button("🗑️ Очистить диалог", use_container_width=True, key="clear_chat_button"):
+            st.session_state.messages = []
+            # Удаляем файл физически
+            if os.path.exists("chat_history.json"):
+                os.remove("chat_history.json")
+            st.rerun()
+        
+        # Технические детали для понимания производительности и ограничений
+        with st.expander("💻 Hardware & Performance", expanded=True):
+            st.markdown(
+                """
+                <small>
+                **Модель**:
+                Mistral-Nemo (12B, Quantized)
+                
+                **Мин тех. требования**:
+                
+                **GPU**:
+                NVIDIA RTX 3050 Laptop (4GB VRAM)
+                
+                **RAM**:
+                > 12GB
+                
+                ⏱️ **Ср. скорость:** 10 мин/запрос
+                
+                **Рекомендация**:
+                **GPU**:
+                > 8 GB
+                
+                **RAM**:
+                > 16GB
+                </small>
+                """, 
+                unsafe_allow_html=True
+            )
+        
+        st.divider()
+        
+        if st.button("🗑️ Очистить диалог", use_container_width=True):
             st.session_state.messages = []
             st.session_state.last_sources = None
-            st.rerun() # Перезагрузка страницы
+            st.rerun()
             
-        st.markdown("---")
-        st.caption("Архитектура: Multi-Query -> Hybrid Search (BM25+Vector) -> RRF -> Mistral-Nemo")
+        st.caption("Architecture: Multi-Query -> Hybrid Search (BM25+Vector) -> RRF -> Mistral-Nemo")
         
     return k_value
 

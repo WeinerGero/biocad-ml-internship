@@ -15,7 +15,7 @@ class RAGPipeline:
         self.vector_db = VectorDB(persist_dir=db_path)
         self.llm = OllamaLLM(
             model=model_name,
-            temperature=0.2,
+            temperature=0.4,
             num_ctx=12_288,
             repeat_penalty=1.1, # Наказываем за повторения
             top_p=0.9,
