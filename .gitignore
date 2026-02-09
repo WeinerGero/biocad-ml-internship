@@ -208,3 +208,6 @@ __marimo__/
 
 # Local SQLite database files
 db
+
+# Streamlit configuration directory
+.streamlit
