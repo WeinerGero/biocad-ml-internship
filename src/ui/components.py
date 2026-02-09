@@ -2,6 +2,8 @@ import os
 import streamlit as st
 
 
+HISTORY_FILE = "chat_history.json"
+
 def render_sidebar():
     """
     Отрисовывает боковую панель с настройками и тех. данными.
@@ -18,15 +20,7 @@ def render_sidebar():
         )
         
         st.divider()
-        
-        # Кнопка для очистки диалога
-        if st.button("🗑️ Очистить диалог", use_container_width=True, key="clear_chat_button"):
-            st.session_state.messages = []
-            # Удаляем файл физически
-            if os.path.exists("chat_history.json"):
-                os.remove("chat_history.json")
-            st.rerun()
-        
+                
         # Технические детали для понимания производительности и ограничений
         with st.expander("💻 Hardware & Performance", expanded=True):
             st.markdown(
@@ -58,11 +52,18 @@ def render_sidebar():
         
         st.divider()
         
-        if st.button("🗑️ Очистить диалог", use_container_width=True):
+        if st.button("Очистить диалог", use_container_width=True, key="clear_chat_button"):
+            # 1. Очищаем оперативную память
             st.session_state.messages = []
             st.session_state.last_sources = None
-            st.rerun()
             
+            # 2. УДАЛЯЕМ ФАЙЛ С ДИСКА
+            if os.path.exists(HISTORY_FILE):
+                os.remove(HISTORY_FILE)
+            
+            # 3. Перезагружаем страницу, чтобы применились изменения
+            st.rerun()
+
         st.caption("Architecture: Multi-Query -> Hybrid Search (BM25+Vector) -> RRF -> Mistral-Nemo")
         
     return k_value

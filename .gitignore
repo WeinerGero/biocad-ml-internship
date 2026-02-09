@@ -211,3 +211,6 @@ db
 
 # Streamlit configuration directory
 .streamlit
+
+# Streamlit chat history file
+chat_history.json
