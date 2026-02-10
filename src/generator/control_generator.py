@@ -1,4 +1,6 @@
 import re
+import asyncio
+
 from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -93,60 +95,68 @@ class RAGPipeline:
             print("WARNING: VectorDB is empty, BM25 skipped.")
             self.bm25 = None
             
-    def hybrid_search(self, query: str, k: int = 15):
+    async def ahybrid_search(self, query: str, k: int = 15):
         """
         Выполняет гибридный поиск (Vector + BM25) с агрегацией по PMID.
         Используется как поставщик кандидатов для глобального слияния.
         """
-        # Очистка запроса от лишних символов
         clean_query = query.replace('"', '').replace("'", "").strip()
-    
+
+        # Векторный поиск
         if not self.bm25:
-            vector_results = self.vector_db.search(clean_query, k=k)
+            vector_results = await self.vector_db.asearch(clean_query, k=k)
             return [doc for doc, _ in vector_results]
 
         fetch_k = 100 
-        vector_results = self.vector_db.search(clean_query, k=fetch_k)
+        
+        # Запускаем векторный поиск асинхронно
+        vector_task = self.vector_db.asearch(clean_query, k=fetch_k)
+        
+        # Пока ждем вектора, можем подготовить данные для BM25
+        tokenized_query = clean_query.lower().split()
+        
+        # Дожидаемся результатов векторного поиска
+        vector_results = await vector_task
         vector_docs = [doc for doc, _ in vector_results]
 
-        tokenized_query = clean_query.lower().split()
+        # BM25 поиск 
         bm25_docs = self.bm25.get_top_n(tokenized_query, self.bm25_docs, n=fetch_k)
 
+        # Логика RRF
         rank_fusion = {}
         c = 60
 
         def add_to_fusion(docs_list):
+            # Проходим по результатам и накапливаем баллы для каждого PMID
             for rank, doc in enumerate(docs_list):
                 pmid = str(doc.metadata.get('pmid', 'N/A'))
+                # Если PMID отсутствует, пропускаем документ, так как мы не сможем его корректно агрегировать
                 if pmid == 'N/A': continue
-                
                 if pmid not in rank_fusion:
-                    # Изменено: храним список docs вместо одного doc
                     rank_fusion[pmid] = {'docs': [], 'score': 0.0}
-                
-                # Добавляем чанк в список, если их меньше 3-х (самые релевантные)
+                # Ограничиваем до 3 документов на PMID, чтобы избежать доминирования одной статьи
                 if len(rank_fusion[pmid]['docs']) < 3:
-                    # Проверка на дубликаты контента внутри одной статьи
                     if doc.page_content not in [d.page_content for d in rank_fusion[pmid]['docs']]:
                         rank_fusion[pmid]['docs'].append(doc)
-                
                 rank_fusion[pmid]['score'] += 1.0 / (rank + c)
 
         add_to_fusion(vector_docs)
         add_to_fusion(bm25_docs)
 
+        # Сортируем статьи по накопленному баллу RRF и отбираем топ-k
         sorted_articles = sorted(
             rank_fusion.values(), 
             key=lambda x: x['score'], 
             reverse=True
         )
         
-        # Собираем все чанки из k лучших статей в один плоский список
+        # Собираем финальный список документов из топ-k статей, учитывая ограничение в 3 документа на статью
         final_docs = []
         for item in sorted_articles[:k]:
             final_docs.extend(item['docs'])
         
         return final_docs
+
                 
     def _format_context(self, docs):
         """
@@ -311,15 +321,15 @@ class RAGPipeline:
             print(f"\n[XXX] FAILURE. Статья все еще за пределами топ-{k}.")
         print(f"{'='*70}\n")
     
-    def run(self, query: str, k: int = 15) -> dict:
+    async def astream_run(self, query: str, k: int = 15) -> dict:
         """
-        Запускает мульти-стратегический RAG pipeline:
+        Запускает асинхронный мульти-стратегический RAG pipeline:
         1. Генерация 3-х образов поиска (Macro, Micro, Relational).
         2. Гибридный поиск по каждой стратегии.
         3. Глобальная дедупликация и ранжирование (Global Fusion).
         4. Синтез ответа на основе расширенного контекста.
         """
-        # 1. УНИВЕРСАЛЬНАЯ ГЕНЕРАЦИЯ СТРАТЕГИЙ (Zoom Strategy)
+        # Генерация 3-х запросов на английском
         mq_prompt = PromptTemplate.from_template(
             """
             Role: Senior Scientific Search Expert.
@@ -342,36 +352,47 @@ class RAGPipeline:
         
         # Генерация англоязычных стратегий
         chain = mq_prompt | self.llm | StrOutputParser()
-        raw_output = chain.invoke({"question": query})
+    
+        # Асинхронный вызов генерации стратегий
+        raw_output = await chain.ainvoke({"question": query})
         
-        # Очистка и фильтрация строк
+        # Очищаем и создаем список запросов
         english_queries = []
         for line in raw_output.split("\n"):
             clean_line = re.sub(r'^\d+[\.\s\-/]+', '', line).strip()
             if len(clean_line) > 5:
                 english_queries.append(clean_line)
-        
-        # print(f"DEBUG: Generated Strategies for Search:\n" + "\n".join(english_queries))
 
-        # 2. СБОР КАНДИДАТОВ (Wide Funnel)
-        # Берем по 60 результатов на каждую стратегию, чтобы не потерять редкие статьи
+        # Отдаем статус поиска и стратегии в UI
+        yield {"status": "searching", "strategies": english_queries}
+
+        # Создаем список корутин для каждой стратегии
         intermediate_k = 60
+        search_tasks = [self.ahybrid_search(eq, k=intermediate_k) for eq in english_queries]
+        
+        # Запускаем все поиски одновременно
+        search_results = await asyncio.gather(*search_tasks)
+
+        # Глобальная агрегация результатов по PMID с RRF-стратегией
         global_article_scores = {}
         c = 60
 
-        for eq in english_queries:
-            candidates = self.hybrid_search(eq, k=intermediate_k)
-            
+        for candidates in search_results:
+            # Проходим по результатам каждого запроса и накапливаем баллы для каждого PMID
             for rank, doc in enumerate(candidates):
                 pmid = str(doc.metadata.get('pmid', 'N/A'))
+                if pmid == 'N/A': continue
+                
+                # Инициализация записи для нового PMID
                 if pmid not in global_article_scores:
-                    # Храним расширенный список фрагментов
                     global_article_scores[pmid] = {'docs': [], 'score': 0.0}
                 
+                # Ограничиваем до 3 документов на PMID, чтобы избежать доминирования одной статьи
                 if len(global_article_scores[pmid]['docs']) < 3:
                     if doc.page_content not in [d.page_content for d in global_article_scores[pmid]['docs']]:
                         global_article_scores[pmid]['docs'].append(doc)
                 
+                # Накопительный эффект: статья может быть в результатах всех 3-х запросов, что увеличивает ее итоговый балл
                 global_article_scores[pmid]['score'] += 1.0 / (rank + c)
 
         sorted_global = sorted(
@@ -380,21 +401,21 @@ class RAGPipeline:
             reverse=True
         )
         
-        # Извлекаем все чанки для топ-k статей
+        # Собираем финальный список документов из топ-k статей, учитывая ограничение в 3 документа на статью
         retrieved_docs = []
         for item in sorted_global[:k]:
             retrieved_docs.extend(item['docs'])
         
-        # ГЕНЕРАЦИЯ ОТВЕТА
+        # Отдаем статус генерации и найденные источники в UI
+        yield {"status": "generating", "sources": retrieved_docs}
+        
+        # Форматируем контекст для LLM
         context_text = self._format_context(retrieved_docs)
         final_prompt = self.rag_prompt.format(context=context_text, question=query)
-        response = self.llm.invoke(final_prompt)
-
-        return {
-            "query": query,
-            "answer": response,
-            "source_documents": retrieved_docs
-        }
+        
+        # Асинхронный стриминг ответа от LLM
+        async for token in self.llm.astream(final_prompt):
+            yield {"status": "streaming", "answer_chunk": token}
 
  
 if __name__ == "__main__":

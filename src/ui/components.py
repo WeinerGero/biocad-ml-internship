@@ -26,13 +26,14 @@ def render_sidebar():
             st.markdown(
                 """
                 <small>
+                
                 **Модель**:
                 Mistral-Nemo (12B, Quantized)
                 
                 **Мин тех. требования**:
                 
                 **GPU**:
-                NVIDIA RTX 3050 Laptop (4GB VRAM)
+                > 4 GB
                 
                 **RAM**:
                 > 12GB
@@ -46,6 +47,9 @@ def render_sidebar():
                 
                 **RAM**:
                 > 16GB
+                
+                ⏱️ **Ср. скорость:** 60 сек/запрос
+                
                 </small>
                 """, 
                 unsafe_allow_html=True

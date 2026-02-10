@@ -40,15 +40,15 @@ class VectorDB:
             batch = documents[i:i+batch_size]
             self.vector_store.add_documents(batch)
             
-    def search(self, query: str, k: int=3):
+    async def asearch(self, query: str, k: int=3):
         """
-        Выполняет поиск по векторной базе данных.
+        Выполняет поиск по векторной базе данных асинхронно.
         
         :param query str: Запрос для поиска
         :param k int: Количество возвращаемых результатов
         :return list[Document]: Список найденных документов
         """
-        return self.vector_store.similarity_search_with_score(query, k=k)
+        return await self.vector_store.asimilarity_search_with_score(query, k=k)
 
 
 if __name__ == "__main__":

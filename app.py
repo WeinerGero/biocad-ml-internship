@@ -1,5 +1,5 @@
+import asyncio
 import streamlit as st
-import time
 
 from src.generator.control_generator import RAGPipeline
 from src.ui.state_manager import init_session_state, save_history
@@ -65,42 +65,65 @@ for msg in st.session_state.messages:
     render_message(msg["role"], msg["content"], msg.get("sources"))
 
 # Обработка нового ввода пользователя
-if prompt := st.chat_input("Введите ваш вопрос об исследовании..."):
-    # Отображаем вопрос пользователя сразу
+if prompt := st.chat_input("Введите ваш вопрос..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     render_message("user", prompt)
+    save_history()
 
-    # Генерация ответа
-    with st.chat_message("assistant"):
-        # Контейнер статуса показывает, что происходит "под капотом"
-        with st.status("Анализ научных статей...", expanded=True) as status:
-            
-            st.write("Генерация поисковых стратегий...")
-            start_time = time.time()
-            
-            # Запуск RAG
-            result = rag.run(prompt, k=k_value)
-            
-            duration = time.time() - start_time
-            st.write(f"Поиск и генерация заняли: {duration:.2f} сек")
-            
-            # Показываем, что нашли (для прозрачности)
-            if "strategies" in result:
-                st.info(f"Стратегии поиска:\n" + "\n".join([f"- {s}" for s in result["strategies"]]))
-            
-            status.update(label="Готово!", state="complete", expanded=False)
-
-        # Вывод ответа
-        st.markdown(result["answer"])
+    with st.chat_message("assistant", avatar="🧬"):
+        # Плейсхолдер для стриминга текста
+        response_placeholder = st.empty()
         
-        # Вывод источников
-        if result.get("source_documents"):
-            render_sources(result["source_documents"])
+        # Контейнер-мост для данных между async и sync кодом
+        stream_data = {
+            "full_response": "",
+            "sources": None
+        }
+        
+        with st.status("Поиск статей...", expanded=True) as status:
+            
+            async def process_stream():
+                # Асинхронный цикл для обработки стрима от RAGPipeline
+                async for chunk in rag.astream_run(prompt, k=k_value):
+                    # Обработка разных этапов генерации и обновление UI
+                    if chunk["status"] == "searching":
+                        st.write("🔍 Разделяю запрос:")
+                        # Выводим стратегии поиска, которые RAGPipeline использует для поиска в базе
+                        for s in chunk["strategies"]:
+                            st.write(f"- {s}")
+                        status.update(label="Поиск в базе PubMed...")
+                        
+                    # Когда начинается генерация ответа, мы получаем список уникальных статей и обновляем статус
+                    elif chunk["status"] == "generating":
+                        stream_data["sources"] = chunk["sources"]
+                        st.write(f"📚 Найдено уникальных статей: {len(stream_data['sources'])}")
+                        status.update(label="Ответ готовится...")
+                        status.update(state="complete", expanded=False)
+                     
+                    # Во время генерации мы получаем чанки текста и обновляем плейсхолдер, добавляя каретку в конце для эффекта печати    
+                    elif chunk["status"] == "streaming":
+                        stream_data["full_response"] += chunk["answer_chunk"]
+                        # Обновляем UI по мере поступления токенов
+                        response_placeholder.markdown(stream_data["full_response"] + "▌")
 
-        # Сохранение в историю
+            # Запуск асинхронного цикла
+            try:
+                asyncio.run(process_stream())
+            except Exception as e:
+                st.error(f"Ошибка при генерации: {e}")
+
+        # Финальное отображение (убираем каретку ▌)
+        response_placeholder.markdown(stream_data["full_response"])
+        
+        # Отрисовка источников
+        if stream_data["sources"]:
+            render_sources(stream_data["sources"])
+
+        # Сохранение в историю сессии
         st.session_state.messages.append({
             "role": "assistant",
-            "content": result["answer"],
+            "content": stream_data["full_response"],
+            "sources": stream_data["sources"]
         })
         
-        save_history() 
+        save_history()
