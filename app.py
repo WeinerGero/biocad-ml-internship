@@ -1,4 +1,5 @@
 import asyncio
+import threading
 import streamlit as st
 
 from src.generator.control_generator import RAGPipeline
@@ -33,6 +34,39 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+@st.cache_resource
+def get_app_lock():
+    """
+    Создает один общий замок для всех пользователей приложения.
+    Это гарантирует, что GPU будет занят только одной задачей в конкретный момент времени.
+    """
+    return threading.Lock()
+
+app_lock = get_app_lock()
+
+async def process_stream():
+                # Асинхронный цикл для обработки стрима от RAGPipeline
+                async for chunk in rag.astream_run(prompt, k=k_value):
+                    # Обработка разных этапов генерации и обновление UI
+                    if chunk["status"] == "searching":
+                        st.write("🔍 Разделяю запрос:")
+                        # Выводим стратегии поиска, которые RAGPipeline использует для поиска в базе
+                        for s in chunk["strategies"]:
+                            st.write(f"- {s}")
+                        status.update(label="Поиск в базе PubMed...")
+                        
+                    # Когда начинается генерация ответа, мы получаем список уникальных статей и обновляем статус
+                    elif chunk["status"] == "generating":
+                        stream_data["sources"] = chunk["sources"]
+                        st.write(f"📚 Найдено уникальных статей: {len(stream_data['sources'])}")
+                        status.update(label="Ответ готовится...")
+                        status.update(state="complete", expanded=False)
+                     
+                    # Во время генерации мы получаем чанки текста и обновляем плейсхолдер, добавляя каретку в конце для эффекта печати    
+                    elif chunk["status"] == "streaming":
+                        stream_data["full_response"] += chunk["answer_chunk"]
+                        # Обновляем UI по мере поступления токенов
+                        response_placeholder.markdown(stream_data["full_response"] + "▌")
 
 # Кешируем загрузку RAGPipeline, с помощью cache_resource,
 # чтобы не перезагружать модель при каждом взаимодействии
@@ -81,36 +115,12 @@ if prompt := st.chat_input("Введите ваш вопрос..."):
         }
         
         with st.status("Поиск статей...", expanded=True) as status:
-            
-            async def process_stream():
-                # Асинхронный цикл для обработки стрима от RAGPipeline
-                async for chunk in rag.astream_run(prompt, k=k_value):
-                    # Обработка разных этапов генерации и обновление UI
-                    if chunk["status"] == "searching":
-                        st.write("🔍 Разделяю запрос:")
-                        # Выводим стратегии поиска, которые RAGPipeline использует для поиска в базе
-                        for s in chunk["strategies"]:
-                            st.write(f"- {s}")
-                        status.update(label="Поиск в базе PubMed...")
-                        
-                    # Когда начинается генерация ответа, мы получаем список уникальных статей и обновляем статус
-                    elif chunk["status"] == "generating":
-                        stream_data["sources"] = chunk["sources"]
-                        st.write(f"📚 Найдено уникальных статей: {len(stream_data['sources'])}")
-                        status.update(label="Ответ готовится...")
-                        status.update(state="complete", expanded=False)
-                     
-                    # Во время генерации мы получаем чанки текста и обновляем плейсхолдер, добавляя каретку в конце для эффекта печати    
-                    elif chunk["status"] == "streaming":
-                        stream_data["full_response"] += chunk["answer_chunk"]
-                        # Обновляем UI по мере поступления токенов
-                        response_placeholder.markdown(stream_data["full_response"] + "▌")
-
-            # Запуск асинхронного цикла
-            try:
-                asyncio.run(process_stream())
-            except Exception as e:
-                st.error(f"Ошибка при генерации: {e}")
+            with app_lock:
+                # Запуск асинхронного цикла
+                try:
+                    asyncio.run(process_stream())
+                except Exception as e:
+                    st.error(f"Ошибка при генерации: {e}")
 
         # Финальное отображение (убираем каретку ▌)
         response_placeholder.markdown(stream_data["full_response"])
@@ -127,3 +137,4 @@ if prompt := st.chat_input("Введите ваш вопрос..."):
         })
         
         save_history()
+
