@@ -10,7 +10,7 @@
 
 * Python 3.10+
 
-* Ollama
+* Ollama 0.15.5+
 
 * Учетные данные NCBI (Email и API Key) 
 
